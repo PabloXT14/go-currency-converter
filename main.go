@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/pabloxt14/go-currency-converter/models"
 )
@@ -33,13 +34,49 @@ func main() {
 	err = json.NewDecoder(file).Decode(&data)
 	check(err)
 
-	fmt.Println(data.Base)
-	fmt.Println(data.Date)
-	fmt.Println(data.Rates)
+	// GET ARGS
+	args := os.Args[1:] // ignore the first argument (./program_name)
+
+	const MIN_ARGS_LENGTH = 2
+
+	if len(args) < MIN_ARGS_LENGTH {
+		fmt.Println("Informe: [valor_em_reais] [moeda_destino]. Ex: ./converter 100 USD")
+		return
+		// os.Exit(1) // Close the program with an error code, and don't execute the defer statements
+	}
+
+	amount, err := strconv.ParseFloat(args[0], 64)
+	if err != nil {
+		fmt.Println("Valor inválido. Informe um número válido.")
+		return
+	}
+
+	// GET CURRENCY
+	currency := args[1]
+
+	rate, ok := data.Rates[currency]
+	if !ok {
+		fmt.Printf("Moeda inválida. Informe uma das seguintes moedas: %v\n", getCurrencies(data.Rates))
+		return
+	}
+
+	fmt.Println("Amount:", amount)
+	fmt.Println("Currency:", currency)
+	fmt.Println("Rate:", rate)
 }
 
 func check(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func getCurrencies(rates map[string]float64) []string {
+	currencies := make([]string, 0, len(rates))
+
+	for currency := range rates {
+		currencies = append(currencies, currency)
+	}
+
+	return currencies
 }
