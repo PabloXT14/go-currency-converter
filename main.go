@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/pabloxt14/go-currency-converter/models"
 )
@@ -52,7 +53,7 @@ func main() {
 	}
 
 	// GET CURRENCY
-	currency := args[1]
+	currency := strings.ToUpper(args[1])
 
 	rate, ok := data.Rates[currency]
 	if !ok {
@@ -60,9 +61,10 @@ func main() {
 		return
 	}
 
-	fmt.Println("Amount:", amount)
-	fmt.Println("Currency:", currency)
-	fmt.Println("Rate:", rate)
+	// CONVERT
+	convertedAmount := amount * rate
+
+	fmt.Printf("%.2f BRL = %.2f %s\n", amount, convertedAmount, currency)
 }
 
 func check(err error) {
