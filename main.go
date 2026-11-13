@@ -3,82 +3,83 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
-	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/pabloxt14/go-currency-converter/models"
 )
 
+const (
+	ratesFilePath = "data/rates.json"
+	minArgsLength = 2
+	usageMessage  = "uso: ./converter [valor_em_reais] [moeda_destino]. Ex: ./converter 100 USD"
+)
+
 func main() {
-	path := filepath.Join("data/rates.json")
+	if err := run(os.Args[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
 
-	// Read the file data/rates.json slurping it's entire content into memory (not recommended for large files)
-	// file, err := os.ReadFile(path)
+func run(args []string) error {
+	amount, currency, err := parseArgs(args)
+	if err != nil {
+		return err
+	}
 
-	// check(err)
+	rates, err := loadRates(ratesFilePath)
+	if err != nil {
+		return err
+	}
 
-	// data := map[string]models.Rates{}
+	rate, ok := rates.Rates[currency]
+	if !ok {
+		return fmt.Errorf(
+			"moeda inválida %q. Moedas disponíveis: %s",
+			currency,
+			strings.Join(availableCurrencies(rates.Rates), ", "),
+		)
+	}
 
-	// err = json.Unmarshal(file, &data)
+	fmt.Printf("%.2f BRL = %.2f %s\n", amount, amount*rate, currency)
 
-	// check(err)
+	return nil
+}
 
-	// Json.NewDecoder() is more performant => Lê e decodifica diretamente de um io.Reader, ou seja, linha por linha, sendo útil também para arquivos grandes e chamadas de API que retornam JSON, pois não é necessário carregar todo o conteúdo na memória antes de decodificar.
+func parseArgs(args []string) (amount float64, currency string, err error) {
+	if len(args) < minArgsLength {
+		return 0, "", fmt.Errorf(usageMessage)
+	}
+
+	amount, err = strconv.ParseFloat(args[0], 64)
+	if err != nil {
+		return 0, "", fmt.Errorf("valor inválido %q: informe um número válido", args[0])
+	}
+
+	return amount, strings.ToUpper(args[1]), nil
+}
+
+// loadRates usa json.NewDecoder para decodificar direto do arquivo, sem carregar todo o conteúdo em memória (como os.ReadFile faria).
+func loadRates(path string) (models.Rates, error) {
+	var rates models.Rates
+
 	file, err := os.Open(path)
-	check(err)
+	if err != nil {
+		return rates, fmt.Errorf("abrindo arquivo de taxas: %w", err)
+	}
 	defer file.Close()
 
-	var data models.Rates
-
-	err = json.NewDecoder(file).Decode(&data)
-	check(err)
-
-	// GET ARGS
-	args := os.Args[1:] // ignore the first argument (./program_name)
-
-	const MIN_ARGS_LENGTH = 2
-
-	if len(args) < MIN_ARGS_LENGTH {
-		fmt.Println("Informe: [valor_em_reais] [moeda_destino]. Ex: ./converter 100 USD")
-		return
-		// os.Exit(1) // Close the program with an error code, and don't execute the defer statements
+	if err := json.NewDecoder(file).Decode(&rates); err != nil {
+		return rates, fmt.Errorf("decodificando taxas: %w", err)
 	}
 
-	amount, err := strconv.ParseFloat(args[0], 64)
-	if err != nil {
-		fmt.Println("Valor inválido. Informe um número válido.")
-		return
-	}
-
-	// GET CURRENCY
-	currency := strings.ToUpper(args[1])
-
-	rate, ok := data.Rates[currency]
-	if !ok {
-		fmt.Printf("Moeda inválida. Informe uma das seguintes moedas: %v\n", getCurrencies(data.Rates))
-		return
-	}
-
-	// CONVERT
-	convertedAmount := amount * rate
-
-	fmt.Printf("%.2f BRL = %.2f %s\n", amount, convertedAmount, currency)
+	return rates, nil
 }
 
-func check(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-func getCurrencies(rates map[string]float64) []string {
-	currencies := make([]string, 0, len(rates))
-
-	for currency := range rates {
-		currencies = append(currencies, currency)
-	}
-
-	return currencies
+func availableCurrencies(rates map[string]float64) []string {
+	return slices.Sorted(maps.Keys(rates))
 }
